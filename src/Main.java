@@ -1,16 +1,13 @@
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 public class Main {
 
-
-
     public static void inserirEspecialidade(String nomeEspecialidade) {
         String sql = "INSERT INTO Especialidade (Nome) VALUES (?)";
 
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+        try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             // Define o valor do parâmetro
