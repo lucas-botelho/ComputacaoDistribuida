@@ -90,6 +90,11 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
         }
     }
 
+    @Override
+    public int teste(int valor) throws RemoteException {
+        return valor *2;
+    }
+
 
     public ServerActions() throws RemoteException {
     }

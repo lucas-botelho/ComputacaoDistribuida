@@ -6,5 +6,6 @@ public interface IServerActions extends Remote {
     void cancelarConsulta(int idConsulta) throws RemoteException;
     void listarConsulta(int idUser) throws RemoteException;
     void registarUtilizador(String username, String password) throws RemoteException;
+    int teste(int valor) throws RemoteException;
 
 }
