@@ -1,0 +1,59 @@
+-- Drop existing database if it exists (optional, for cleanup)
+DROP DATABASE IF EXISTS DistributedComputingDB;
+
+-- Create the database
+CREATE DATABASE DistributedComputingDB;
+
+-- Use the created database
+USE DistributedComputingDB;
+
+-- Drop existing tables if they exist to avoid conflicts
+DROP TABLE IF EXISTS Consulta;
+DROP TABLE IF EXISTS Medico;
+DROP TABLE IF EXISTS Pessoa;
+DROP TABLE IF EXISTS Especialidade;
+DROP TABLE IF EXISTS Clinicas;
+
+-- Create the table for Clinics
+CREATE TABLE Clinicas (
+    IdClinica INT AUTO_INCREMENT PRIMARY KEY,
+    Nome VARCHAR(255) NOT NULL,
+    Morada VARCHAR(255)
+);
+
+-- Create the table for Specialties
+CREATE TABLE Especialidade (
+    IdEspecialidade INT AUTO_INCREMENT PRIMARY KEY,
+    Nome VARCHAR(255) NOT NULL
+);
+
+-- Create the table for Doctors
+CREATE TABLE Medico (
+    IdMedico INT AUTO_INCREMENT PRIMARY KEY,
+    Nome VARCHAR(255) NOT NULL,
+    IdEspecialidade INT,
+    IdClinica INT,
+    FOREIGN KEY (IdEspecialidade) REFERENCES Especialidade(IdEspecialidade) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (IdClinica) REFERENCES Clinicas(IdClinica) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- Create the table for People (Patients)
+CREATE TABLE Pessoa (
+    IdPessoa INT AUTO_INCREMENT PRIMARY KEY,
+    Nome VARCHAR(255) NOT NULL
+);
+
+-- Create the table for Consultations
+CREATE TABLE Consulta (
+    IdConsulta INT AUTO_INCREMENT PRIMARY KEY,
+    IdClinica INT,
+    IdMedico INT,
+    IdPessoa INT,
+    DataHora DATETIME NOT NULL,
+    FOREIGN KEY (IdClinica) REFERENCES Clinicas(IdClinica) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (IdMedico) REFERENCES Medico(IdMedico) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (IdPessoa) REFERENCES Pessoa(IdPessoa) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Print success message (MySQL doesn't support PRINT, so use a comment)
+-- 'Database and tables created successfully!'
