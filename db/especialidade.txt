@@ -1,0 +1,11 @@
+Nome
+Clínica Geral
+Pediatria
+Cardiologia
+Ginecologia
+Hematologia
+Medicina Tropical
+Neurologia
+Oftalmologia
+Oncologia
+Otorrinolaringologia

@@ -1,0 +1,5 @@
+Nome;Morada
+Clínica A;Rua das Flores, 123
+Clínica B;Avenida Principal, 456
+Clínica C;Praça da Alegria, 789
+Clínica D;Rua da Esperança, 101
