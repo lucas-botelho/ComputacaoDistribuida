@@ -100,35 +100,43 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         LocalDateTime novaHoraConsulta = LocalDateTime.parse(dataHora, formatter);
 
+        System.out.println("Debug: A verificar conflitos de consulta");
+
         for (String consulta : consultas) {
             String[] parts = consulta.split(";");
             if (parts.length >= 6) {
-                int existingUserId = Integer.parseInt(parts[3].trim());
-                int existingClinicaId = Integer.parseInt(parts[1].trim());
-                int existingEspecialidadeId = Integer.parseInt(parts[2].trim());
-                String existingDateHora = parts[4].trim();
-                boolean isCanceled = Boolean.parseBoolean(parts[5].trim());
+                try {
+                    int existingUserId = Integer.parseInt(parts[3].trim());
+                    int existingClinicaId = Integer.parseInt(parts[1].trim());
+                    int existingEspecialidadeId = Integer.parseInt(parts[2].trim());
+                    String existingDateHora = parts[4].trim();
+                    boolean isCanceled = Boolean.parseBoolean(parts[5].trim());
 
-                if (!isCanceled &&
+                    if (!isCanceled &&
                         existingUserId == idUser &&
                         existingClinicaId == idClinica &&
                         existingEspecialidadeId == idEspecialidade) {
 
-                    LocalDateTime existingConsultationTime = LocalDateTime.parse(existingDateHora, formatter);
+                        LocalDateTime existingConsultationTime = LocalDateTime.parse(existingDateHora, formatter);
 
-                    // Verificar se a nova consulta esta em conflito com a consulta existente
-                    if (!novaHoraConsulta.isBefore(existingConsultationTime.plusHours(1)) &&
-                            !novaHoraConsulta.isAfter(existingConsultationTime.minusHours(1))) {
-                        System.out.println("Debug: Conflict found with existing consultation at: " + existingDateHora);
-                        return true;
+                        System.out.println("Debug: Encontrada consulta para user, clinica e especialidade igual");
+                        if (!novaHoraConsulta.isBefore(existingConsultationTime.plusHours(1)) &&
+                                !novaHoraConsulta.isAfter(existingConsultationTime.minusHours(1))) {
+                            System.out.println("Debug: Conflito encontrado com a consulta existente em: " + existingDateHora);
+                            return true;
+                        }
                     }
+                } catch (Exception e) {
+                    System.out.println("Erro ao processar consulta: " + consulta + ". Detalhes do erro: " + e.getMessage());
                 }
             } else {
-                System.out.println("Debug: Malformed consultation line: " + consulta);
+                System.out.println("Debug: Linha de consulta mal formada: " + consulta);
             }
         }
+        System.out.println("Debug: Não foram encontrados conflitos.");
         return false;
     }
+
 
     private static void updateConsultas(int idClinica, int idUser, String dataHora, int selectedMedicoId, int idConsulta) throws IOException {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(CONSULTA_FILE, true))) {
@@ -165,6 +173,8 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
                 break;
             }
         }
+
+        System.out.println("Debug: Id do medico encontrado: " + selectedMedicoId);
         return selectedMedicoId;
     }
 
