@@ -54,85 +54,37 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
         System.out.println("Debug: Starting reservarConsulta for IdClinica: " + idClinica + ", IdEspecialidade: " + idEspecialidade + ", IdUser: " + idUser + ", DataHora: " + dataHora);
 
         try {
+            ArrayList<String> consultas = readFromFile(CONSULTA_FILE);
+            System.out.println("Debug: Loaded " + consultas.size() + " existing consultations.");
+
+            if (isAlreadyBooked(dataHora, idUser, idClinica, idEspecialidade,  consultas)) return false;
+
             String medicos = getMedicosPorIdEspecialidade(idEspecialidade);
             if (medicos.trim().isEmpty()) {
                 System.out.println("Debug: No doctors found for IdEspecialidade: " + idEspecialidade);
                 return false;
             }
 
+            ArrayList<String> medicosValidos = getMedicosComEspecialidade(idClinica, medicos);
 
-            ArrayList<String> medicosDisponiveis = new ArrayList<>();
-            String[] medicoLines = medicos.split("\n");
-            for (String line : medicoLines) {
-                String[] parts = line.split(";");
-                if (parts.length >= 4) {
-                    int idMedico = Integer.parseInt(parts[0].trim());
-                    String nomeMedico = parts[1].trim();
-                    int clinicaMedico = Integer.parseInt(parts[3].trim());
-
-                    if (clinicaMedico == idClinica) {
-                        medicosDisponiveis.add(String.valueOf(idMedico));
-                        System.out.println("Debug: Médico disponível encontrado: " + nomeMedico + " (IdMedico: " + idMedico + ")");
-                    }
-                } else {
-                    System.out.println("Debug: Linha de médico malformada: " + line);
-                }
-            }
-
-            if (medicosDisponiveis.isEmpty()) {
+            if (medicosValidos.isEmpty()) {
                 System.out.println("Debug: No doctors with IdEspecialidade " + idEspecialidade + " found in clinic with IdClinica: " + idClinica);
                 return false;
             }
 
-            // Step 2: Load existing consultas
-            ArrayList<String> consultas = readFromFile(CONSULTA_FILE);
-            System.out.println("Debug: Loaded " + consultas.size() + " existing consultations.");
-
-            // Step 3: Find a doctor with available schedule
-            int selectedMedicoId = -1;
-            for (String medicoId : medicosDisponiveis) {
-                boolean isAvailable = true;
-
-                for (String consulta : consultas) {
-                    String[] consultaParts = consulta.split(";");
-                    if (consultaParts.length >= 6) {
-                        int idConsultaMedico = Integer.parseInt(consultaParts[2].trim());
-                        String consultaHora = consultaParts[4].trim();
-                        boolean isCanceled = Boolean.parseBoolean(consultaParts[5].trim());
-
-                        if (idConsultaMedico == Integer.parseInt(medicoId) && consultaHora.equals(dataHora) && !isCanceled) {
-                            isAvailable = false;
-                            System.out.println("Debug: Médico com IdMedico " + medicoId + " já tem uma consulta para " + dataHora);
-                            break;
-                        }
-                    } else {
-                        System.out.println("Debug: Linha de consulta malformada: " + consulta);
-                    }
-                }
-
-                if (isAvailable) {
-                    selectedMedicoId = Integer.parseInt(medicoId);
-                    break;
-                }
-            }
+            int selectedMedicoId = getMedicoComHorarioLivre(dataHora, medicosValidos, consultas);
 
             if (selectedMedicoId == -1) {
                 System.out.println("Debug: No doctors available at the specified time: " + dataHora);
                 return false;
             }
 
-            // Step 4: Generate a new idConsulta
-            int idConsulta = consultas.size() + 1; // New idConsulta is the next available ID
+            int idConsulta = consultas.size() + 1;
             System.out.println("Debug: Calculated idConsulta: " + idConsulta);
 
-            // Step 5: Append the new consulta to the file
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(CONSULTA_FILE, true))) {
-                bw.write(idConsulta + ";" + idClinica + ";" + selectedMedicoId + ";" + idUser + ";" + dataHora + ";false");
-                bw.newLine();
-                System.out.println("Consulta reservada com sucesso! idConsulta: " + idConsulta);
-            }
+            updateConsultas(idClinica, idUser, dataHora, selectedMedicoId, idConsulta);
 
-            return true; // Success
+            return true;
 
         } catch (IOException e) {
             System.out.println("Debug: Exception occurred while reserving consulta: " + e.getMessage());
@@ -140,8 +92,101 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
         } catch (Exception e) {
             System.out.println("Debug: Unexpected exception: " + e.getMessage());
             e.printStackTrace();
-            return false; // Return false in case of an unexpected error
+            return false;
         }
+    }
+
+    private static boolean isAlreadyBooked(String dataHora, int idUser, int idClinica, int idEspecialidade, ArrayList<String> consultas) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime novaHoraConsulta = LocalDateTime.parse(dataHora, formatter);
+
+        for (String consulta : consultas) {
+            String[] parts = consulta.split(";");
+            if (parts.length >= 6) {
+                int existingUserId = Integer.parseInt(parts[3].trim());
+                int existingClinicaId = Integer.parseInt(parts[1].trim());
+                int existingEspecialidadeId = Integer.parseInt(parts[2].trim());
+                String existingDateHora = parts[4].trim();
+                boolean isCanceled = Boolean.parseBoolean(parts[5].trim());
+
+                if (!isCanceled &&
+                        existingUserId == idUser &&
+                        existingClinicaId == idClinica &&
+                        existingEspecialidadeId == idEspecialidade) {
+
+                    LocalDateTime existingConsultationTime = LocalDateTime.parse(existingDateHora, formatter);
+
+                    // Verificar se a nova consulta esta em conflito com a consulta existente
+                    if (!novaHoraConsulta.isBefore(existingConsultationTime.plusHours(1)) &&
+                            !novaHoraConsulta.isAfter(existingConsultationTime.minusHours(1))) {
+                        System.out.println("Debug: Conflict found with existing consultation at: " + existingDateHora);
+                        return true;
+                    }
+                }
+            } else {
+                System.out.println("Debug: Malformed consultation line: " + consulta);
+            }
+        }
+        return false;
+    }
+
+    private static void updateConsultas(int idClinica, int idUser, String dataHora, int selectedMedicoId, int idConsulta) throws IOException {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(CONSULTA_FILE, true))) {
+            bw.write(idConsulta + ";" + idClinica + ";" + selectedMedicoId + ";" + idUser + ";" + dataHora + ";false");
+            bw.newLine();
+            System.out.println("Consulta reservada com sucesso! idConsulta: " + idConsulta);
+        }
+    }
+
+    private static int getMedicoComHorarioLivre(String dataHora, ArrayList<String> medicosValidos, ArrayList<String> consultas) {
+        int selectedMedicoId = -1;
+        for (String medicoId : medicosValidos) {
+            boolean isAvailable = true;
+
+            for (String consulta : consultas) {
+                String[] consultaParts = consulta.split(";");
+                if (consultaParts.length >= 6) {
+                    int idConsultaMedico = Integer.parseInt(consultaParts[2].trim());
+                    String consultaHora = consultaParts[4].trim();
+                    boolean isCanceled = Boolean.parseBoolean(consultaParts[5].trim());
+
+                    if (idConsultaMedico == Integer.parseInt(medicoId) && consultaHora.equals(dataHora) && !isCanceled) {
+                        isAvailable = false;
+                        System.out.println("Debug: Médico com IdMedico " + medicoId + " já tem uma consulta para " + dataHora);
+                        break;
+                    }
+                } else {
+                    System.out.println("Debug: Linha de consulta malformada: " + consulta);
+                }
+            }
+
+            if (isAvailable) {
+                selectedMedicoId = Integer.parseInt(medicoId);
+                break;
+            }
+        }
+        return selectedMedicoId;
+    }
+
+    private static ArrayList<String> getMedicosComEspecialidade(int idClinica, String medicos) {
+        ArrayList<String> medicosDisponiveis = new ArrayList<>();
+        String[] medicoLines = medicos.split("\n");
+        for (String line : medicoLines) {
+            String[] parts = line.split(";");
+            if (parts.length >= 4) {
+                int idMedico = Integer.parseInt(parts[0].trim());
+                String nomeMedico = parts[1].trim();
+                int clinicaMedico = Integer.parseInt(parts[3].trim());
+
+                if (clinicaMedico == idClinica) {
+                    medicosDisponiveis.add(String.valueOf(idMedico));
+                    System.out.println("Debug: Médico disponível encontrado: " + nomeMedico + " (IdMedico: " + idMedico + ")");
+                }
+            } else {
+                System.out.println("Debug: Linha de médico malformada: " + line);
+            }
+        }
+        return medicosDisponiveis;
     }
 
     //4.1
