@@ -54,14 +54,13 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
         System.out.println("Debug: Starting reservarConsulta for IdClinica: " + idClinica + ", IdEspecialidade: " + idEspecialidade + ", IdUser: " + idUser + ", DataHora: " + dataHora);
 
         try {
-            // Step 1: Get all doctors with the specified specialty
             String medicos = getMedicosPorIdEspecialidade(idEspecialidade);
             if (medicos.trim().isEmpty()) {
                 System.out.println("Debug: No doctors found for IdEspecialidade: " + idEspecialidade);
                 return false;
             }
 
-            // Parse the doctors and filter for those belonging to the specified clinic
+
             ArrayList<String> medicosDisponiveis = new ArrayList<>();
             String[] medicoLines = medicos.split("\n");
             for (String line : medicoLines) {
@@ -338,6 +337,8 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
         LocalDateTime now = LocalDateTime.now();
 
         System.out.println("Debug: Starting listarConsulta for idUser: " + idUser);
+        String[] medicos = listarMedicos().split("\n");
+        String[] clinicas = listarClinicas().split("\n");
 
         try {
             // Use readFromFile to load all lines (excluding the header)
@@ -356,7 +357,26 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
 
                     if (idPessoa == idUser && !isCanceled && dataConsulta.isAfter(now)) {
                         System.out.println("Debug: Valid match found for idUser: " + idUser);
-                        results += idConsulta + ";" + parts[1] + ";" + parts[2] + ";" + parts[4] + "\n";
+
+                        String idMedico = parts[2];
+                        String nomeMedico = "";
+                        for (String medico : medicos) {
+                            String[] dadosMedico = medico.split(";");
+                            if (idMedico.equals(dadosMedico[0])){
+                                nomeMedico = dadosMedico[1];
+                            }
+                        }
+
+                        String idClinica = parts[2];
+                        String nomeClinica = "";
+                        for (String clinica : clinicas) {
+                            String[] dadosClinica = clinica.split(";");
+                            if (idClinica.equals(dadosClinica[0])){
+                                nomeClinica = dadosClinica[1];
+                            }
+                        }
+
+                        results += idConsulta + ";" + nomeClinica + ";" + nomeMedico + ";" + parts[4] + "\n";
                         found = true;
                     } else if (idPessoa == idUser) {
                         if (isCanceled) {
@@ -376,6 +396,41 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
 
         System.out.println("Debug: Consultas found: " + results);
         return found ? results : "Nenhuma consulta encontrada para o usuário.";
+    }
+
+
+    public String listarMedicos() {
+        StringBuilder medicos = new StringBuilder();
+
+        System.out.println("Debug: Starting listarMedicos.");
+
+        try {
+            ArrayList<String> lines = readFromFile(MEDICO_FILE);
+            System.out.println("Debug: Loaded " + lines.size() + " medico lines from file.");
+
+            for (String line : lines) {
+                System.out.println("Debug: Processing medico line: " + line);
+                String[] parts = line.split(";");
+
+                if (parts.length >= 4) { // Ensure the line has the required fields
+                    int idMedico = Integer.parseInt(parts[0].trim());
+                    String nomeMedico = parts[1].trim();
+
+                    medicos.append(idMedico)
+                            .append(";")
+                            .append(nomeMedico)
+                            .append("\n");
+                } else {
+                    System.out.println("Debug: Malformed medico line: " + line);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Debug: Exception occurred while listing medicos: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        System.out.println("Debug: Finished listarMedicos.");
+        return medicos.length() > 0 ? medicos.toString() : "";
     }
 
     //4.4
