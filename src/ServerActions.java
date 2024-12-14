@@ -120,8 +120,10 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
                         LocalDateTime existingConsultationTime = LocalDateTime.parse(existingDateHora, formatter);
 
                         System.out.println("Debug: Encontrada consulta para user, clinica e especialidade igual");
-                        if (!novaHoraConsulta.isBefore(existingConsultationTime.plusHours(1)) &&
-                                !novaHoraConsulta.isAfter(existingConsultationTime.minusHours(1))) {
+                        if (novaHoraConsulta.isBefore(existingConsultationTime.minusHours(1)) ||
+                                novaHoraConsulta.isAfter(existingConsultationTime.plusHours(1)))
+                        {
+                        } else {
                             System.out.println("Debug: Conflito encontrado com a consulta existente em: " + existingDateHora);
                             return true;
                         }
@@ -422,7 +424,7 @@ public class ServerActions extends UnicastRemoteObject implements IServerActions
                             }
                         }
 
-                        String idClinica = parts[2];
+                        String idClinica = parts[1];
                         String nomeClinica = "";
                         for (String clinica : clinicas) {
                             String[] dadosClinica = clinica.split(";");
